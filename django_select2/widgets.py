@@ -1,6 +1,7 @@
 """
 Contains all the Django widgets for Select2.
 """
+import json
 
 import logging
 from itertools import chain
@@ -20,6 +21,7 @@ from . import __RENDER_SELECT2_STATICS as RENDER_SELECT2_STATICS
 
 logger = logging.getLogger(__name__)
 
+DEFAULT_OPTIONS_ATTR = 'data-django-select2'
 
 def get_select2_js_libs():
     from django.conf import settings
@@ -230,12 +232,9 @@ class Select2Mixin(object):
         if choices:
             args.append(choices)
 
+        attrs = self.build_value_based_attrs(value, attrs, choices)
+
         s = unicode(super(Select2Mixin, self).render(*args))  # Thanks to @ouhouhsami Issue#1
-        if RENDER_SELECT2_STATICS:
-            s += self.media.render()
-        final_attrs = self.build_attrs(attrs)
-        id_ = final_attrs.get('id', None)
-        s += self.render_js_code(id_, name, value, attrs, choices)
 
         if logger.isEnabledFor(logging.DEBUG):
             util.timer_end(t1)
@@ -243,9 +242,19 @@ class Select2Mixin(object):
 
         return mark_safe(s)
 
-    class Media:
-        js = get_select2_js_libs()
-        css = {'screen': get_select2_css_libs(light=True)}
+    def build_attrs(self, *args, **kwargs):
+        attrs = super(Select2Mixin, self).build_attrs(*args, **kwargs)
+        id_ = attrs.get('id', None)
+        options = dict(self.get_options())
+        attrs[self.options_attr] = self.render_select2_options_code(options, id_)
+        return attrs
+
+    def build_value_based_attrs(self, value, attrs, choices):
+        return attrs
+
+    # class Media:
+    #     js = get_select2_js_libs()
+    #     css = {'screen': get_select2_css_libs(light=True)}
 
 
 class Select2Widget(Select2Mixin, forms.Select):
@@ -404,6 +413,7 @@ class HeavySelect2Mixin(Select2Mixin):
         self.url = kwargs.pop('data_url', None)
         self.userGetValTextFuncName = kwargs.pop('userGetValTextFuncName', u'null')
         self.choices = kwargs.pop('choices', [])
+        self.options_attr = kwargs.pop('options_attr', DEFAULT_OPTIONS_ATTR)
 
         if not self.view and not self.url:
             raise ValueError('data_view or data_url is required')
@@ -492,22 +502,36 @@ class HeavySelect2Mixin(Select2Mixin):
         if value is not None and (self.field is None or value not in empty_values):
             # Just like forms.Select.render() it assumes that value will be single valued.
             values = [value]
-            texts = self.render_texts(values, choices)
-            if texts:
-                return u"$('#%s').txt(%s);" % (id_, texts)
+            return self.render_texts(values, choices)
+            # if texts:
+            #     return u"$('#%s').txt(%s);" % (id_, texts)
 
-    def render_inner_js_code(self, id_, name, value, attrs=None, choices=(), *args):
-        js = u"$('#%s').change(django_select2.onValChange).data('userGetValText', %s);" \
-            % (id_, self.userGetValTextFuncName)
+    def build_attrs(self, *args, **kwargs):
+        attrs = super(HeavySelect2Mixin, self).build_attrs(*args, **kwargs)
+        id_ = attrs.get('id', None)
+        value = attrs.get('value', None)
+        attrs['data-userGetValText'] = self.userGetValTextFuncName
+        return attrs
+
+    def build_value_based_attrs(self, value, attrs, choices):
+        id_ = self.build_attrs().get('id', None)
         texts = self.render_texts_for_value(id_, value, choices)
         if texts:
-            js += texts
-        js += super(HeavySelect2Mixin, self).render_inner_js_code(id_, name, value, attrs, choices, *args)
-        return js
+            attrs['data-django-select2-txt'] = texts
+        return attrs
 
-    class Media:
-        js = get_select2_heavy_js_libs()
-        css = {'screen': get_select2_css_libs()}
+    # def render_inner_js_code(self, id_, name, value, attrs=None, choices=(), *args):
+    #     js = u"$('#%s').change(django_select2.onValChange).data('userGetValText', %s);" \
+    #         % (id_, self.userGetValTextFuncName)
+    #     texts = self.render_texts_for_value(id_, value, choices)
+    #     if texts:
+    #         js += texts
+    #     js += super(HeavySelect2Mixin, self).render_inner_js_code(id_, name, value, attrs, choices, *args)
+    #     return js
+
+    # class Media:
+    #     js = get_select2_heavy_js_libs()
+    #     css = {'screen': get_select2_css_libs()}
 
 
 class HeavySelect2Widget(HeavySelect2Mixin, forms.TextInput):

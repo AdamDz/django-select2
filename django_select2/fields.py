@@ -87,9 +87,10 @@ from django.utils.encoding import smart_unicode, force_unicode
 from .widgets import Select2Widget, Select2MultipleWidget,\
     HeavySelect2Widget, HeavySelect2MultipleWidget, AutoHeavySelect2Widget, \
     AutoHeavySelect2MultipleWidget, AutoHeavySelect2Mixin, AutoHeavySelect2TagWidget, \
-    HeavySelect2TagWidget
+    HeavySelect2TagWidget, DEFAULT_OPTIONS_ATTR
 from .views import NO_ERR_RESP
 from .util import extract_some_key_val
+
 
 
 ### Light general fields ###
@@ -474,11 +475,12 @@ class HeavySelect2FieldBaseMixin(object):
             t1 = util.timer_start('HeavySelect2FieldBaseMixin.__init__')
 
         data_view = kwargs.pop('data_view', None)
+        options_attr = kwargs.pop('options_attr', DEFAULT_OPTIONS_ATTR)
         choices = kwargs.pop('choices', [])
 
         kargs = {}
         if kwargs.get('widget', None) is None:
-            kargs['widget'] = self.widget(data_view=data_view)
+            kargs['widget'] = self.widget(data_view=data_view, options_attr=options_attr)
 
         kargs.update(kwargs)
         super(HeavySelect2FieldBaseMixin, self).__init__(*args, **kargs)
